@@ -1,8 +1,18 @@
+from dataclasses import dataclass
 from ppadb.client import Client
 from ppadb.device import Device
 import time
 import xml.etree.ElementTree as ET
 import io
+
+@dataclass
+class BasicElement:
+    text: str
+    x1: int
+    y1: int
+    x2: int
+    y2: int
+    element: ET.Element
 
 class Adb:
     """
@@ -55,17 +65,22 @@ class Adb:
         return xml_root
     
 
-    def get_list_of_elements(self, xml_root: ET.Element) -> list:
+    def get_list_of_elements(self, xml_root: ET.Element = None) -> tuple[list[BasicElement], list[BasicElement]]:
         """
         Get a list of elements from the XML root element.
-        Each element is represented as a list containing the text, width, height,
-        width1, height1, and type of the element.
+        Will get current XML if no XML root is provided.
+        The method returns two lists:
+        1. text_els: A list of elements with text attributes.
+        2. clickable_els: A list of clickable elements.
         """
+
+        if xml_root is None:
+            xml_root = self._get_current_xml()
 
         # get all elements with text attribute
         elements = xml_root.findall(".//*[@text]")
 
-        e = []
+        text_els = []
         for element in elements:
             text = element.attrib["text"]
             if text == "":
@@ -73,21 +88,45 @@ class Adb:
 
             bounds = element.attrib["bounds"] # [0,0][1080,1920]
             bounds1 = bounds.split("][")[0][1:]
-            width = int(bounds1.split(",")[0])
-            height = int(bounds1.split(",")[1])
+            x1 = int(bounds1.split(",")[0])
+            y1 = int(bounds1.split(",")[1])
 
             bounds1 = bounds.split("][")[1][:-1]
-            width1 = int(bounds1.split(",")[0])
-            height1 = int(bounds1.split(",")[1])
+            x2 = int(bounds1.split(",")[0])
+            y2 = int(bounds1.split(",")[1])
 
-            e.append([text, width, height, width1, height1, "text"])
+            e = BasicElement(text, x1, y1, x2, y2, element)
+            if e not in text_els:
+                text_els.append(e)
+
+        # # get all elements with content-desc attribute
+        elements = xml_root.findall(".//*[@content-desc]")
+        for element in elements:
+            text = element.attrib["content-desc"]
+            if text == "":
+                continue
+
+            bounds = element.attrib["bounds"]
+            bounds1 = bounds.split("][")[0][1:]
+            x1 = int(bounds1.split(",")[0])
+            y1 = int(bounds1.split(",")[1])
+
+            bounds1 = bounds.split("][")[1][:-1]
+            x2 = int(bounds1.split(",")[0])
+            y2 = int(bounds1.split(",")[1])
+
+            e = BasicElement(text, x1, y1, x2, y2, element)
+            if e not in text_els:
+                text_els.append(e)
 
         # get all elements where clickable attribute is true
         elements = xml_root.findall(".//*[@clickable='true']")
+
+        clickable_els = []
         for element in elements:
             text = element.attrib["text"]
             if text == "":
-                text = element.attrib["class"]
+                text = element.attrib["content-desc"]
 
             bounds = element.attrib["bounds"]
             bounds1 = bounds.split("][")[0][1:]
@@ -100,10 +139,12 @@ class Adb:
 
             focused = element.attrib["focused"] == "true"
 
-            if [text, width, height, width1, height1, "text"] not in e:
-                e.append([text, width, height, width1, height1, "focused" if focused else "clickable", element])
+            e = BasicElement(text, width, height, width1, height1, element)
 
-        return e
+            if e not in clickable_els:
+                clickable_els.append(e)
+
+        return text_els, clickable_els
 
     def back_keyevent(self):
         """
@@ -114,22 +155,29 @@ class Adb:
         self.device.shell("input keyevent KEYCODE_BACK")
         time.sleep(3)
     
-    def find_elements_by_text(self, text: str) -> list[ET.Element]:
+    def get_elements_by_text(self, text: str) -> list[ET.Element]:
         """
         Find an element by its text attribute in the current XML hierarchy.
         This method searches for the element in the XML hierarchy and returns it if found.
         If the element is not found, it returns False.
         """
 
-        root = self._get_current_xml()
+        # root = self._get_current_xml()
 
-        elements = root.findall(".//*[@text]")
-        e = []
-        for element in elements:
-            if element.attrib["text"] == text:
-                e.append(element)
-        
-        return e
+        # elements = root.findall(".//*[@text]")
+        # e = []
+        # for element in elements:
+        #     if element.attrib["text"] == text:
+        #         e.append(element)
+
+        # elements = root.findall(".//*[@content-desc]")
+        # for element in elements:
+        #     if element.attrib["content-desc"] == text:
+        #         if element not in e:
+        #             e.append(element)
+
+        elements, _ = self.get_list_of_elements()
+        return [e.element for e in elements if e.text == text]
     
     def find_element_by_scroll(self, text: str, down: bool = True, max_tries: int = 5) -> ET.Element:
         """
@@ -139,7 +187,7 @@ class Adb:
         """
 
         for i in range(max_tries):
-            el = self.find_elements_by_text(text)
+            el = self.get_elements_by_text(text)
             if el:
                 for element in el:
                     if element.attrib["text"] == text:
@@ -153,7 +201,7 @@ class Adb:
         
         return False
     
-    def find_element_by_bounds(self, x1: int = None, y1: int = None, x2: int = None, y2: int = None) -> str:
+    def find_element_by_bounds(self, x1: int = None, y1: int = None, x2: int = None, y2: int = None) -> ET.Element:
         """
         Find an element by its bounds in the current XML hierarchy.
         This method searches for the element in the XML hierarchy and returns it if found.
@@ -181,9 +229,9 @@ class Adb:
             if _x1 == x1 and _y1 == y1 and _x2 == x2 and _y2 == y2:
                 return element
             
-        return NotImplemented
+        return None
     
-    def find_element_within_bounds(self, min_x1: int = None, max_x1: int = None, min_y1: int = None, max_y1: int = None, min_x2: int = None, max_x2: int = None, min_y2: int = None, max_y2: int = None) -> list:
+    def get_elements_within_bounds(self, min_x1: int = None, max_x1: int = None, min_y1: int = None, max_y1: int = None, min_x2: int = None, max_x2: int = None, min_y2: int = None, max_y2: int = None) -> list[ET.Element]:
         """
         Find elements within the specified bounds in the current XML hierarchy.
         This method searches for elements in the XML hierarchy and returns a list of elements that fall within the specified bounds.
@@ -220,7 +268,7 @@ class Adb:
         
         return found_elements
     
-    def find_center_of_element(self, element: ET.Element) -> tuple[int, int]:
+    def get_center_of_element(self, element: ET.Element) -> tuple[int, int]:
         """
         Find the center of the given element.
         This method calculates the center coordinates of the element based on its bounds.
@@ -248,16 +296,16 @@ class Adb:
         self.device.shell(f"input tap {x} {y}")
         time.sleep(2)
 
-    def click_on_element(self, element: ET.Element):
+    def click_element(self, element: ET.Element):
         """
         Click on the given element.
         This method simulates a click on the center of the element using the 'input tap' command.
         """
 
-        x, y = self.find_center_of_element(element)
+        x, y = self.get_center_of_element(element)
         self.click(x, y)
 
-    def input_text_with_space(self, text: str):
+    def input_text(self, text: str):
         """
         Input text with spaces using the ADB shell command.
         This method splits the text by spaces and inputs each word separately,
