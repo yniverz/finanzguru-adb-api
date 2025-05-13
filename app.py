@@ -67,7 +67,7 @@ class AccountManager:
         self.guru.request_bank_update()
 
         for account in self.data.api_accounts:
-            balance = self.guru.get_account_current_app_balance(account.name)
+            balance, _ = self.guru.get_account_current_app_balance(account.name)
             account.balance = balance
             print(f"Updated {account.name} balance: {balance}")
 
@@ -118,18 +118,29 @@ class AccountManager:
 
 
 def run_server(manager_instance: AccountManager):
+    global request_update_done
+
     app = FastAPI()
 
     @app.get("/accounts")
     def get_api_accounts():
         return JSONResponse(content=manager_instance.data.api_accounts_dict())
     
+    request_update_done = True
     @app.get("/request_update")
     def request_update():
-        if manager_instance.guru.request_bank_update(block=False):
+        global request_update_done
+        if request_update_done:
+            request_update_done = False
+            def update():
+                global request_update_done
+                manager_instance.update_api_account_balances()
+                request_update_done = True
+            
+            threading.Thread(target=update, daemon=True).start()
             return JSONResponse(content={"status": "ok"})
         else:
-            return JSONResponse(content={"status": "error"}, status_code=429)
+            return JSONResponse(content={"status": "busy"}, status_code=429)
     
     @app.get("/last_update")
     def get_last_update():
