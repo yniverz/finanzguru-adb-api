@@ -1,11 +1,12 @@
 from dataclasses import dataclass
+import datetime
 import json
 import threading
 import time
 import traceback
-
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+import pytz
 import requests
 import uvicorn
 
@@ -112,8 +113,33 @@ class AccountManager:
 
         self.guru.update_account_balance(account.name, new_balance, threshhold=10)
 
+    def run(self):
+        """
+        Run the account manager
+        :return: None
+        """
+        
+        while True:
+            try:
+                print(f"Waiting for {self.data.timing.start_hour}:00...")
+                time_now = datetime.datetime.now(pytz.timezone('Europe/Berlin'))
+                while time_now.hour != self.data.timing.start_hour and time_now.minute != 0:
+                    time.sleep(1)
 
+            except KeyboardInterrupt:
+                print("Delay skipped, continuing in 5 seconds")
+                time.sleep(5)
 
+            try:
+                self.guru.init_app()
+
+                self.check_virtual_accounts()
+
+                self.update_api_account_balances()
+
+            except Exception as e:
+                print(traceback.format_exc())
+                time.sleep(2)
 
 
 
@@ -143,10 +169,11 @@ def run_server(manager_instance: AccountManager):
             return JSONResponse(content={"status": "ok"})
         else:
             return JSONResponse(content={"status": "busy"}, status_code=429)
-    
-    @app.get("/last_update")
-    def get_last_update():
-        return JSONResponse(content={"last_update": manager_instance.guru.last_bank_update})
+        
+    @app.get("/update_running")
+    def update_running():
+        global request_update_done
+        return JSONResponse(content={"status": "busy" if not request_update_done else "ok"})
     
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")
 

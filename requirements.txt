@@ -2,3 +2,5 @@ pure-python-adb
 pytz
 requests
 tqdm
+fastapi
+uvicorn
