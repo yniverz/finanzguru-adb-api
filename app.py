@@ -30,12 +30,18 @@ class Timing:
     start_hour: int = 22
     interval_hours: int = 24
 
+@dataclass
+class ServerSettings:
+    host: str = "0.0.0.0"
+    port: int = 8000
+    log_level: str = "info"
 
 class Config:
     def __init__(self, config_file: str = "config.json"):
         self.config_file = config_file
         self.timing: Timing = Timing()
         self.device_pin = None
+        self.server_settings: ServerSettings = ServerSettings()
         self.api_accounts: list[APIAccount] = []
         self.last_api_update: float = 0
         self.virtual_accounts: list[VirtualAccount] = []
@@ -49,6 +55,7 @@ class Config:
             data: dict = json.load(f)
             self.timing = Timing(**data.get("timing", {}))
             self.device_pin = data.get("device_pin", None)
+            self.server_settings = ServerSettings(**data.get("server_settings", {}))
             self.api_accounts = [APIAccount(name=name) for name in data.get("api_accounts", [])]
             self.virtual_accounts = [VirtualAccount(name=name, **acc) for name, acc in data.get("virtual_accounts", {}).items()]
 
@@ -175,7 +182,10 @@ def run_server(manager_instance: AccountManager):
         global request_update_done
         return JSONResponse(content={"status": "busy" if not request_update_done else "ok"})
     
-    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")
+    uvicorn.run(app, 
+                host=manager_instance.data.server_settings.host, 
+                port=manager_instance.data.server_settings.port, 
+                log_level=manager_instance.data.server_settings.log_level)
 
 if __name__ == "__main__":
     manager = AccountManager()
