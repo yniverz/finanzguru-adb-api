@@ -124,7 +124,9 @@ def run_server(manager_instance: AccountManager):
 
     @app.get("/accounts")
     def get_api_accounts():
-        return JSONResponse(content=manager_instance.data.api_accounts_dict())
+        accounts = manager_instance.data.api_accounts_dict()
+        accounts["last_update"] = manager_instance.data.last_api_update
+        return JSONResponse(content=accounts)
     
     request_update_done = True
     @app.get("/request_update")
