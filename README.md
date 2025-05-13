@@ -1,3 +1,6 @@
+[![License: NCPUL](https://img.shields.io/badge/license-NCPUL-blue.svg)](./LICENSE.md)
+
+
 # Finanzguru ADB API
 
 Make the balances shown in the [Finanzguru](https://finanzguru.de) Android app available as a REST API and insert custom virtual accounts automatically.
