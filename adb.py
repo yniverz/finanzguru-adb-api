@@ -193,6 +193,7 @@ class Adb:
                     if element.attrib["text"] == text:
                         return element
             
+            print(f"Element '{text}' not found, scrolling {'down' if down else 'up'}...")
             if down:
                 self.device.shell("input swipe 500 1000 500 500")
             else:
