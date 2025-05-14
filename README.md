@@ -22,9 +22,9 @@ No Finanzguru or bank credentials ever leave your device.
 
 ```
 ┌──────────────┐     USB / adb      ┌───────────────────┐
-│  Python app  │◀──────────────────▶│ Android device     │
-│  (this repo) │                    │ – Finanzguru app   │
-└──────────────┘     REST / JSON    │ – ADB daemon       │
+│  Python app  │◀──────────────────▶│ Android device    │
+│  (this repo) │                    │ – Finanzguru app  │
+└──────────────┘     REST / JSON    │ – ADB daemon      │
            ▲────────────────────────┘
            │ 127.0.0.1:8000
    Your dashboard / scripts
