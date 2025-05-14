@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import datetime
 import json
+import sys
 import threading
 import time
 import traceback
@@ -120,7 +121,7 @@ class AccountManager:
 
         self.guru.update_account_balance(account.name, new_balance, threshhold=10)
 
-    def run(self):
+    def run(self, force_update: bool = False):
         """
         Run the account manager
         :return: None
@@ -128,10 +129,14 @@ class AccountManager:
         
         while True:
             try:
-                print(f"Waiting for {self.data.timing.start_hour}:00...")
-                time_now = datetime.datetime.now(pytz.timezone('Europe/Berlin'))
-                while time_now.hour != self.data.timing.start_hour and time_now.minute != 0:
-                    time.sleep(1)
+                if not force_update:
+                    print(f"Waiting for {self.data.timing.start_hour}:00...")
+                    time_now = datetime.datetime.now(pytz.timezone('Europe/Berlin'))
+                    while time_now.hour != self.data.timing.start_hour and time_now.minute != 0:
+                        time.sleep(1)
+                else:
+                    print("Force update requested, skipping delay")
+                    force_update = False
 
             except KeyboardInterrupt:
                 print("Delay skipped, continuing in 5 seconds")
@@ -195,7 +200,13 @@ if __name__ == "__main__":
     server_thread = threading.Thread(target=run_server, args=(manager,), daemon=True)
     server_thread.start()
 
-    manager.run()
+    # get passed argument from command line
+    update_on_start = False
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "force_update":
+            update_on_start = True
+
+    manager.run(force_update=update_on_start)
 
 
 # Example config.json:
