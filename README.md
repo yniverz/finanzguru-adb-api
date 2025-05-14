@@ -112,6 +112,9 @@ Create a `config.json` in the project root (it is ignored by Git thanks to `.git
 $ python app.py
 ```
 
+Optionally, you can run `python app.py force_update` to trigger a manual refresh immediately.
+This will skip the waiting period the first time and start the refresh process right away.
+
 The script will:
 
 1. Wait until the next scheduled `start_hour`.
