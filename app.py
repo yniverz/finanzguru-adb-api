@@ -148,6 +148,8 @@ class AccountManager:
                 print(traceback.format_exc())
                 time.sleep(2)
 
+            time.sleep(120)
+
 
 
 def run_server(manager_instance: AccountManager):
@@ -193,8 +195,7 @@ if __name__ == "__main__":
     server_thread = threading.Thread(target=run_server, args=(manager,), daemon=True)
     server_thread.start()
 
-    while True:
-        time.sleep(1)
+    manager.run()
 
 
 # Example config.json:
