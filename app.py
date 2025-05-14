@@ -65,7 +65,6 @@ class AccountManager:
     def __init__(self, config: Config = Config()):
         self.data = config
         self.guru = FinanzGuruClient(device_pin=config.device_pin)
-        self.guru.init_app()
 
     def update_api_account_balances(self):
         """
