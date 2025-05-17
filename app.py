@@ -10,8 +10,19 @@ from fastapi.responses import JSONResponse
 import pytz
 import requests
 import uvicorn
+from builtins import print as _print
 
 from finanzguru import FinanzGuruClient
+
+def print(*args, **kwargs):
+    """
+    Custom print function to add a timestamp to the output
+    """
+    time_now = datetime.datetime.now(pytz.timezone('Europe/Berlin'))
+    time_str = time_now.strftime("%Y-%m-%d %H:%M:%S")
+    _print(f"[{time_str}] ", end="")
+    _print(*args, **kwargs)
+
 
 
 @dataclass
@@ -23,8 +34,8 @@ class APIAccount:
 class VirtualAccount:
     name: str
     data_url: str = ""
-    json_balance_key_path: list[str] = None
-    foreign_currency: str = None
+    json_balance_key_path: list[str] = []
+    foreign_currency: str = ""
 
 @dataclass
 class Timing:
@@ -41,7 +52,7 @@ class Config:
     def __init__(self, config_file: str = "config.json"):
         self.config_file = config_file
         self.timing: Timing = Timing()
-        self.device_pin = None
+        self.device_pin: str = ""
         self.server_settings: ServerSettings = ServerSettings()
         self.api_accounts: list[APIAccount] = []
         self.last_api_update: float = 0
@@ -55,7 +66,7 @@ class Config:
         with open(self.config_file, "r") as f:
             data: dict = json.load(f)
             self.timing = Timing(**data.get("timing", {}))
-            self.device_pin = data.get("device_pin", None)
+            self.device_pin = data.get("device_pin", "")
             self.server_settings = ServerSettings(**data.get("server_settings", {}))
             self.api_accounts = [APIAccount(name=name) for name in data.get("api_accounts", [])]
             self.virtual_accounts = [VirtualAccount(name=name, **acc) for name, acc in data.get("virtual_accounts", {}).items()]
@@ -94,7 +105,7 @@ class AccountManager:
                     raise Exception(f"Error: {r.status_code}")
                 
                 data = r.json()
-                if account.json_balance_key_path is not None:
+                if account.json_balance_key_path:
                     for key in account.json_balance_key_path:
                         data = data[key]
                 
