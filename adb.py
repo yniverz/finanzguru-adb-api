@@ -4,6 +4,7 @@ from ppadb.device import Device
 import time
 import xml.etree.ElementTree as ET
 import io
+from helpers import print
 
 @dataclass
 class BasicElement:

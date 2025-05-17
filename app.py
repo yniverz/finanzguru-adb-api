@@ -10,18 +10,9 @@ from fastapi.responses import JSONResponse
 import pytz
 import requests
 import uvicorn
-from builtins import print as _print
+from helpers import print
 
 from finanzguru import FinanzGuruClient
-
-def print(*args, **kwargs):
-    """
-    Custom print function to add a timestamp to the output
-    """
-    time_now = datetime.datetime.now(pytz.timezone('Europe/Berlin'))
-    time_str = time_now.strftime("%Y-%m-%d %H:%M:%S")
-    _print(f"[{time_str}] ", end="")
-    _print(*args, **kwargs)
 
 
 

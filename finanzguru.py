@@ -5,6 +5,7 @@ import time
 from ppadb.device import Device
 import xml.etree.ElementTree as ET
 import adb
+from helpers import print
 
 
 class FinanzGuruClient:
