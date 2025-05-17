@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import datetime
 import json
 import sys
@@ -34,7 +34,7 @@ class APIAccount:
 class VirtualAccount:
     name: str
     data_url: str = ""
-    json_balance_key_path: list[str] = []
+    json_balance_key_path: list[str] = field(default_factory=list)
     foreign_currency: str = ""
 
 @dataclass
