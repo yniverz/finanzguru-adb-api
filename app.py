@@ -154,6 +154,8 @@ class AccountManager:
                 print(traceback.format_exc())
                 time.sleep(2)
 
+            print("Done.")
+
             time.sleep(120)
 
 
