@@ -62,7 +62,7 @@ class FinanzGuruClient:
         if not hasattr(self, "overview_button"):
             elements = self.adb_client.get_elements_by_text("Übersicht")
             
-            elements = [e for e in elements if e.attrib.get("clickable") == "true"]
+            elements = [e for e in elements if e.element.attrib.get("clickable") == "true"]
             if len(elements) == 0:
                 raise Exception("No clickable elements found with text 'Übersicht'")
             
@@ -79,13 +79,14 @@ class FinanzGuruClient:
 
         self.scroll_to_top_overview()
 
-        widget = self.adb_client.find_element_by_scroll(name)
+        element = self.adb_client.find_element_by_scroll(name)
+        widget = element.element
 
         if widget == False:
             print(f"Widget '{name}' not found, restarting...")
             return False
 
-        bounds = self.adb_client.get_center_of_element(widget)
+        bounds = self.adb_client.get_center_of_element(element)
 
         self.adb_client.click(580, bounds[1])
 
@@ -150,10 +151,10 @@ class FinanzGuruClient:
         time.sleep(25)
 
 
-    def get_account_current_app_balance(self, account_name: str) -> tuple[float, ET.Element]:
+    def get_account_current_app_balance(self, account_name: str) -> tuple[float, adb.BasicElement]:
         self.scroll_to_top_overview()
 
-        element = self.adb_client.find_element_by_scroll(text=account_name)
+        _ = self.adb_client.find_element_by_scroll(text=account_name)
 
         elements, _ = self.adb_client.get_list_of_elements()
         # find index of element with text == account_name
@@ -179,7 +180,7 @@ class FinanzGuruClient:
 
         print(f"Current balance of {account_name} is {amount:.2f} euro")
 
-        return amount, element.element
+        return amount, element
 
     
     def update_account_balance(self, account_name: str, new_balance: float, threshhold: float = 0) -> bool:

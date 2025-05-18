@@ -4,3 +4,5 @@ requests
 tqdm
 fastapi
 uvicorn
+pytesseract
+pillow

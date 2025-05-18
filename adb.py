@@ -1,9 +1,13 @@
 from dataclasses import dataclass
+import subprocess
 from ppadb.client import Client
 from ppadb.device import Device
 import time
 import xml.etree.ElementTree as ET
 import io
+from PIL import Image
+
+import pytesseract
 from helpers import print
 
 @dataclass
@@ -20,7 +24,7 @@ class Adb:
     A class to interact with an Android device using ADB (Android Debug Bridge).
     """
 
-    def __init__(self, device: Device = None):
+    def __init__(self, device: Device = None, adb_binary_path: str = "adb"):
         """
         Initialize the Adb class with the given device.
         If no device is provided, it will use the first available device.
@@ -30,6 +34,7 @@ class Adb:
             device = Client().devices()[0]
 
         self.device: Device = device
+        self.adb_binary_path: str = adb_binary_path
 
     def close_app(self, package_name: str):
         """
@@ -54,16 +59,36 @@ class Adb:
 
     def _get_current_xml(self) -> ET.Element:
         """
-        Get UI hierarchy XML as root element.
-        """
+        Return the root <hierarchy> element of the current UI-Automator dump.
 
-        self.device.shell("uiautomator dump /sdcard/window_dump.xml")
-        xml_str = self.device.shell("cat /sdcard/window_dump.xml")
+        1. Host-side command
+               adb -s <serial> exec-out uiautomator dump /dev/tty
+           streams the XML directly to the PC - no temp file needed.
+
+        2. If that fails (very old Android), we fall back to the
+           original /sdcard/window_dump.xml method.
+        """
+        import subprocess, io
+
+        try:
+            # ── direct exec-out (fast & no SD-card writes) ─────────────
+            raw: bytes = subprocess.check_output(
+                [self.adb_binary_path, "-s", self.device.serial,
+                 "exec-out", "uiautomator", "dump", "/dev/tty"],
+                stderr=subprocess.STDOUT,
+            )
+            # uiautomator prints a status line AFTER the XML – discard it
+            xml_start = raw.find(b"<?xml")
+            xml_bytes = raw[xml_start:]
+            xml_str = xml_bytes.decode("utf-8", errors="replace")
+
+        except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
+            # ── fallback to legacy two-step method ─────────────────────
+            self.device.shell("uiautomator dump /sdcard/window_dump.xml")
+            xml_str = self.device.shell("cat /sdcard/window_dump.xml")
 
         tree = ET.parse(io.StringIO(xml_str))
-        xml_root = tree.getroot()
-
-        return xml_root
+        return tree.getroot()
     
 
     def get_list_of_elements(self, xml_root: ET.Element = None) -> tuple[list[BasicElement], list[BasicElement]]:
@@ -146,6 +171,83 @@ class Adb:
                 clickable_els.append(e)
 
         return text_els, clickable_els
+    
+    def screencap(self) -> Image.Image:
+        """
+        Return a Pillow Image of the current phone screen.
+
+        Tries exactly the same command that works in a shell:
+            adb -s <serial> exec-out screencap -p
+        If that fails (ancient Android or vendor SELinux rules),
+        falls back to two progressively older techniques.
+        """
+
+        def _capture_via_subprocess() -> bytes | None:
+            """Host-side adb exec-out (fast & modern)."""
+            try:
+                raw = subprocess.check_output(
+                    [self.adb_binary_path, "-s", self.device.serial,
+                     "exec-out", "screencap", "-p"],
+                    stderr=subprocess.DEVNULL,
+                )
+                if raw.startswith(b"\x89PNG"):
+                    return raw
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                pass
+            return None
+
+        def _shell_bytes(cmd: str) -> bytes:
+            """Raw bytes from adb shell (compatible with old ppadb)."""
+            try:
+                return self.device.shell(cmd, decode=False)
+            except TypeError:  # ppadb < 1.4 returns str by default
+                out = self.device.shell(cmd)
+                return out.encode("latin1", "ignore") if isinstance(out, str) else out
+
+        # ----- 1) exec-out (Nougat+) -----
+        raw = _capture_via_subprocess()
+        if raw:
+            return Image.open(io.BytesIO(raw))
+
+        # ----- 2) plain shell pipe (works on 4.x+, needs CR/LF fix) -----
+        raw = _shell_bytes("screencap -p")
+        if raw and raw.startswith(b"\x89PNG"):
+            raw = raw.replace(b"\r\n", b"\n")           # pre-Nougat fix
+            try:
+                return Image.open(io.BytesIO(raw))
+            except Exception:
+                pass
+
+        raise RuntimeError("Unable to capture screenshot on this device.")
+
+    def screencap_text(self) -> list[BasicElement]:
+        """
+        Run Tesseract OCR on a fresh screenshot and return a list of
+        BasicElement(text, x1, y1, x2, y2, element=None).
+
+        Coordinates use the phone’s physical pixel grid, matching
+        the values returned by UI-Automator.
+        """
+        img = self.screencap()                      # Pillow Image
+        ocr = pytesseract.image_to_data(
+            img, output_type=pytesseract.Output.DICT, lang="eng"
+        )
+
+        elements: list[BasicElement] = []
+        n_boxes = len(ocr["text"])
+        for i in range(n_boxes):
+            txt = ocr["text"][i].strip()
+            if not txt:                             # ignore empty tokens
+                continue
+            x, y, w, h = (
+                ocr["left"][i],
+                ocr["top"][i],
+                ocr["width"][i],
+                ocr["height"][i],
+            )
+            elements.append(BasicElement(txt, x, y, x + w, y + h, None))
+
+        return elements
 
     def back_keyevent(self):
         """
@@ -155,32 +257,30 @@ class Adb:
 
         self.device.shell("input keyevent KEYCODE_BACK")
         time.sleep(3)
+
+    def enter_keyevent(self):
+        """
+        Press the enter button on the device.
+        This method uses the 'input keyevent' command to simulate an enter button press.
+        """
+
+        self.device.shell("input keyevent KEYCODE_ENTER")
+        time.sleep(3)
     
-    def get_elements_by_text(self, text: str) -> list[ET.Element]:
+    def get_elements_by_text(self, text: str, from_screencap = False) -> list[BasicElement]:
         """
         Find an element by its text attribute in the current XML hierarchy.
         This method searches for the element in the XML hierarchy and returns it if found.
         If the element is not found, it returns False.
         """
 
-        # root = self._get_current_xml()
-
-        # elements = root.findall(".//*[@text]")
-        # e = []
-        # for element in elements:
-        #     if element.attrib["text"] == text:
-        #         e.append(element)
-
-        # elements = root.findall(".//*[@content-desc]")
-        # for element in elements:
-        #     if element.attrib["content-desc"] == text:
-        #         if element not in e:
-        #             e.append(element)
-
-        elements, _ = self.get_list_of_elements()
-        return [e.element for e in elements if e.text == text]
+        if from_screencap:
+            elements = self.screencap_text()
+        else:
+            elements, _ = self.get_list_of_elements()
+        return [e for e in elements if text in e.text]
     
-    def find_element_by_scroll(self, text: str, down: bool = True, max_tries: int = 5) -> ET.Element:
+    def find_element_by_scroll(self, text: str, down: bool = True, max_tries: int = 5, from_screencap = False) -> BasicElement:
         """
         Find an element by its text attribute in the current XML hierarchy.
         This method scrolls the screen in the specified direction (down or up) to find the element.
@@ -188,11 +288,17 @@ class Adb:
         """
 
         for i in range(max_tries):
-            el = self.get_elements_by_text(text)
-            if el:
-                for element in el:
-                    if element.attrib["text"] == text:
+            if from_screencap:
+                elements = self.screencap_text()
+                for element in elements:
+                    if text in element.text:
                         return element
+            else:
+                el = self.get_elements_by_text(text)
+                if el:
+                    for element in el:
+                        if element.text == text:
+                            return element
             
             print(f"Element '{text}' not found, scrolling {'down' if down else 'up'}...")
             if down:
@@ -203,90 +309,13 @@ class Adb:
         
         return False
     
-    def find_element_by_bounds(self, x1: int = None, y1: int = None, x2: int = None, y2: int = None) -> ET.Element:
-        """
-        Find an element by its bounds in the current XML hierarchy.
-        This method searches for the element in the XML hierarchy and returns it if found.
-        If the element is not found, it returns None.
-        """
-
-        root = self._get_current_xml()
-        elements = self.get_list_of_elements(root)
-
-        for element in elements:
-            _x1 = element[1]
-            _y1 = element[2]
-            _x2 = element[3]
-            _y2 = element[4]
-
-            if x1 is None:
-                _x1 = x1
-            if y1 is None:
-                _y1 = x1
-            if x2 is None:
-                _x2 = x1
-            if y2 is None:
-                _y2 = x1
-
-            if _x1 == x1 and _y1 == y1 and _x2 == x2 and _y2 == y2:
-                return element
-            
-        return None
-    
-    def get_elements_within_bounds(self, min_x1: int = None, max_x1: int = None, min_y1: int = None, max_y1: int = None, min_x2: int = None, max_x2: int = None, min_y2: int = None, max_y2: int = None) -> list[ET.Element]:
-        """
-        Find elements within the specified bounds in the current XML hierarchy.
-        This method searches for elements in the XML hierarchy and returns a list of elements that fall within the specified bounds.
-        """
-
-        root = self._get_current_xml()
-        elements = self.get_list_of_elements(root)
-
-        found_elements = []
-        for element in elements:
-            _x1 = element[1]
-            _y1 = element[2]
-            _x2 = element[3]
-            _y2 = element[4]
-
-            if min_x1 is not None and _x1 < min_x1:
-                continue
-            if max_x1 is not None and _x1 > max_x1:
-                continue
-            if min_y1 is not None and _y1 < min_y1:
-                continue
-            if max_y1 is not None and _y1 > max_y1:
-                continue
-            if min_x2 is not None and _x2 < min_x2:
-                continue
-            if max_x2 is not None and _x2 > max_x2:
-                continue
-            if min_y2 is not None and _y2 < min_y2:
-                continue
-            if max_y2 is not None and _y2 > max_y2:
-                continue
-
-            found_elements.append(element)
-        
-        return found_elements
-    
-    def get_center_of_element(self, element: ET.Element) -> tuple[int, int]:
+    def get_center_of_element(self, element: BasicElement) -> tuple[int, int]:
         """
         Find the center of the given element.
         This method calculates the center coordinates of the element based on its bounds.
         """
         
-        bounds = element.attrib["bounds"]
-
-        bounds1 = bounds.split("][")[0][1:]
-        width = int(bounds1.split(",")[0])
-        height = int(bounds1.split(",")[1])
-
-        bounds1 = bounds.split("][")[1][:-1]
-        width1 = int(bounds1.split(",")[0])
-        height1 = int(bounds1.split(",")[1])
-        
-        return int(round((width+width1)/2)), int(round((height+height1)/2))
+        return int(round((element.x1+element.x2)/2)), int(round((element.y1+element.y2)/2))
     
     def click(self, x: int, y: int):
         """
@@ -298,7 +327,7 @@ class Adb:
         self.device.shell(f"input tap {x} {y}")
         time.sleep(2)
 
-    def click_element(self, element: ET.Element):
+    def click_element(self, element: BasicElement):
         """
         Click on the given element.
         This method simulates a click on the center of the element using the 'input tap' command.
