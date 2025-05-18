@@ -95,8 +95,6 @@ class SparkasseClient:
         :param to_account: account to transfer to
         """
 
-        self.ensure_overview()
-
         self.look_and_click("Send")
         time.sleep(5)
 
