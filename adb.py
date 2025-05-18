@@ -1,5 +1,7 @@
 from dataclasses import dataclass
+import shlex
 import subprocess
+import traceback
 from ppadb.client import Client
 from ppadb.device import Device
 import time
@@ -55,7 +57,7 @@ class Adb:
 
         print(f"Opening app {package_name}...")
         self.device.shell(f"am start -n {package_name}/{activity}")
-        time.sleep(5)
+        time.sleep(10)
 
     def _get_current_xml(self) -> ET.Element:
         """
@@ -174,51 +176,49 @@ class Adb:
     
     def screencap(self) -> Image.Image:
         """
-        Return a Pillow Image of the current phone screen.
+        Return a Pillow Image of the current screen.
 
-        Tries exactly the same command that works in a shell:
-            adb -s <serial> exec-out screencap -p
-        If that fails (ancient Android or vendor SELinux rules),
-        falls back to two progressively older techniques.
+        Strategy:
+          A) host-side   adb exec-out screencap -p   ← identical to CLI
+          B) in-shell    screencap -p                ← CR/LF fix
+          C) file hack   screencap to /sdcard + cat  ← last resort
         """
 
-        def _capture_via_subprocess() -> bytes | None:
-            """Host-side adb exec-out (fast & modern)."""
-            try:
-                raw = subprocess.check_output(
-                    [self.adb_binary_path, "-s", self.device.serial,
-                     "exec-out", "screencap", "-p"],
-                    stderr=subprocess.DEVNULL,
-                )
-                if raw.startswith(b"\x89PNG"):
-                    return raw
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                pass
-            return None
+        serial = self.dev.serial
+        try:
+            # A) exact same command that works in your cmd prompt
+            adb_path = "C:\\Program Files\\Nox\\bin\\adb.exe"
+            raw = subprocess.check_output(
+                shlex.split(f'"{adb_path}" exec-out screencap -p'),
+                stderr=subprocess.DEVNULL,   # suppress 'Killed by signal' noise
+            )
+            if raw.startswith(b"\x89PNG"):
+                return Image.open(io.BytesIO(raw))
+            print(raw[:100])
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            print(traceback.format_exc())
+            raw = None  # fall through
 
-        def _shell_bytes(cmd: str) -> bytes:
-            """Raw bytes from adb shell (compatible with old ppadb)."""
+        # B) shell pipe (works back to Android 4.x, needs CR/LF fix)
+        def _run_bytes(cmd: str) -> bytes:
             try:
-                return self.device.shell(cmd, decode=False)
-            except TypeError:  # ppadb < 1.4 returns str by default
-                out = self.device.shell(cmd)
+                return self.dev.shell(cmd, decode=False)
+            except TypeError:                       # old ppadb
+                out = self.dev.shell(cmd)
                 return out.encode("latin1", "ignore") if isinstance(out, str) else out
 
-        # ----- 1) exec-out (Nougat+) -----
-        raw = _capture_via_subprocess()
-        if raw:
-            return Image.open(io.BytesIO(raw))
-
-        # ----- 2) plain shell pipe (works on 4.x+, needs CR/LF fix) -----
-        raw = _shell_bytes("screencap -p")
+        raw = _run_bytes("screencap -p")
         if raw and raw.startswith(b"\x89PNG"):
-            raw = raw.replace(b"\r\n", b"\n")           # pre-Nougat fix
+            raw = raw.replace(b"\r\n", b"\n")       # pre-Nougat fix
             try:
                 return Image.open(io.BytesIO(raw))
             except Exception:
                 pass
 
-        raise RuntimeError("Unable to capture screenshot on this device.")
+        raise Exception(
+            "Failed to get screenshot. "
+            "Try running 'adb kill-server' and 'adb start-server' first."
+        )
 
     def screencap_text(self) -> list[BasicElement]:
         """
@@ -276,9 +276,10 @@ class Adb:
 
         if from_screencap:
             elements = self.screencap_text()
+            return [e for e in elements if text.lower() in e.text.lower()]
         else:
             elements, _ = self.get_list_of_elements()
-        return [e for e in elements if text in e.text]
+            return [e for e in elements if text in e.text]
     
     def find_element_by_scroll(self, text: str, down: bool = True, max_tries: int = 5, from_screencap = False) -> BasicElement:
         """
@@ -291,7 +292,7 @@ class Adb:
             if from_screencap:
                 elements = self.screencap_text()
                 for element in elements:
-                    if text in element.text:
+                    if text.lower() in element.text.lower():
                         return element
             else:
                 el = self.get_elements_by_text(text)
