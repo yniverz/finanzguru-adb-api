@@ -27,12 +27,12 @@ class SparkasseClient:
 
         self.adb_client.close_app("com.starfinanz.smob.android.sfinanzstatus")
 
-        self.adb_client.open_app("com.starfinanz.smob.android.sfinanzstatus", ".MainActivity")
+        self.adb_client.open_app("com.starfinanz.smob.android.sfinanzstatus", ".LauncherActivity")
 
         self.adb_client.input_text(self.app_pin)
         self.adb_client.enter_keyevent()
 
-        print("Waiting for Finanzguru to load...")
+        print("Waiting for Sparkasse to load...")
         time.sleep(30)
         
     def is_overview(self) -> bool:
