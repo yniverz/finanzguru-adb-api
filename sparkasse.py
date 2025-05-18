@@ -16,7 +16,7 @@ class SparkasseClient:
 
         As Sparkasse requires an app pin, the PIN is needed
         """
-        self.adb_client = adb.Adb(adb_device)
+        self.adb_client = adb.Adb(adb_device, "C:\\Program Files\\Nox\\bin\\adb.exe")
         self.app_pin = app_pin
 
     def init_app(self):
