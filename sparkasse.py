@@ -42,7 +42,7 @@ class SparkasseClient:
 
         elements = self.adb_client.screencap_text()
         for element in elements:
-            if "Total amount" in element.text:
+            if "Total" in element.text:
                 return True
         
         return False
