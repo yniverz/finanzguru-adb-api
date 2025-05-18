@@ -30,7 +30,7 @@ class SparkasseClient:
         self.adb_client.open_app("com.starfinanz.smob.android.sfinanzstatus", ".LauncherActivity")
 
         self.adb_client.input_text(self.app_pin)
-        self.adb_client.enter_keyevent()
+        self.adb_client.click(400, 1400)
 
         print("Waiting for Sparkasse to load...")
         time.sleep(30)
