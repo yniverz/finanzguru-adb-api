@@ -132,8 +132,12 @@ class AccountManager:
             try:
                 if not force_update:
                     print(f"Waiting for {self.data.timing.start_hour}:00...")
-                    time_now = datetime.datetime.now(pytz.timezone('Europe/Berlin'))
-                    while time_now.hour != self.data.timing.start_hour and time_now.minute != 0:
+                    
+                    while True:
+                        time_now = datetime.datetime.now(pytz.timezone('Europe/Berlin'))
+                        if time_now.hour == self.data.timing.start_hour and time_now.minute == 0:
+                            print("Starting update...")
+                            break
                         time.sleep(1)
                 else:
                     print("Force update requested, skipping delay")
