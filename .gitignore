@@ -6,7 +6,7 @@
 # App specific files
 config.json
 window_dump.xml
-
+notification_devices/
 
 # Apple specific files
 .DS_Store
