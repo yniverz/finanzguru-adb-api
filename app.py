@@ -11,6 +11,7 @@ import pytz
 import requests
 import uvicorn
 from helpers import print
+import genwebpush
 
 from finanzguru import FinanzGuruClient
 
@@ -156,6 +157,12 @@ class AccountManager:
 
             except Exception as e:
                 print(traceback.format_exc())
+
+                genwebpush.send_simple_notifications(
+                    title="Finanzguru Update Error",
+                    message=f"Error: {e}"
+                )
+
                 time.sleep(2)
 
             print("Done.")
