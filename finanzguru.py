@@ -65,6 +65,8 @@ class FinanzGuruClient:
             elements = [e for e in elements if e.element.attrib.get("clickable") == "true"]
             if len(elements) == 0:
                 raise Exception("No clickable elements found with text 'Übersicht'")
+
+            print(elements)
             
             # click on center of the first element
             element = elements[0]
