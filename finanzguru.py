@@ -60,7 +60,7 @@ class FinanzGuruClient:
             self.init_app()
 
         if not hasattr(self, "overview_button"):
-            elements = self.adb_client.get_elements_by_text("Übersicht")
+            elements = self.adb_client.get_elements_by_text("bersicht")
             
             elements = [e for e in elements if e.element.attrib.get("clickable") == "true"]
             if len(elements) == 0:
