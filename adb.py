@@ -87,6 +87,7 @@ class Adb:
             xml_str = xml_bytes.decode("utf-8", errors="replace")
 
         except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
+            print("Failed to get current XML, falling back to legacy method")
             # ── fallback to legacy two-step method ─────────────────────
             self.device.shell("uiautomator dump /sdcard/window_dump.xml")
             xml_str = self.device.shell("cat /sdcard/window_dump.xml")

@@ -32,6 +32,7 @@ class FinanzGuruClient:
         self.adb_client.open_app("de.dwins.financeguru", ".MainActivity")
 
         if self.device_pin:
+            print("Entering app PIN...")
             self.adb_client.click(250, 830)
             self.adb_client.input_text(self.device_pin)
 
@@ -49,7 +50,7 @@ class FinanzGuruClient:
         for element in elements:
             index = element.attrib["index"]
             text = element.attrib["text"]
-            if text in ["Übersicht", "Ubersicht"] and index == "0":
+            if text in ["Übersicht"] and index == "0":
                 return True
         
         return False
