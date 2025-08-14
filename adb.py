@@ -76,16 +76,28 @@ class Adb:
         # import subprocess, io
 
         try:
-            # ── direct exec-out (fast & no SD-card writes) ─────────────
-            raw: bytes = subprocess.check_output(
-                [self.adb_binary_path, "-s", self.device.serial,
-                 "exec-out", "uiautomator", "dump", "/dev/tty"],
-                stderr=subprocess.STDOUT,
-            )
-            # uiautomator prints a status line AFTER the XML – discard it
-            xml_start = raw.find(b"<?xml")
-            xml_bytes = raw[xml_start:]
-            xml_str = xml_bytes.decode("utf-8", errors="replace")
+            # # ── direct exec-out (fast & no SD-card writes) ─────────────
+            # raw: bytes = subprocess.check_output(
+            #     [self.adb_binary_path, "-s", self.device.serial,
+            #      "exec-out", "uiautomator", "dump", "/dev/tty"],
+            #     stderr=subprocess.STDOUT,
+            # )
+            # # uiautomator prints a status line AFTER the XML – discard it
+            # xml_start = raw.find(b"<?xml")
+            # xml_bytes = raw[xml_start:]
+            # xml_str = xml_bytes.decode("utf-8", errors="replace")
+
+            out = self.device.shell("uiautomator dump --compressed /dev/tty || uiautomator dump /dev/tty")
+
+            start = out.find("<?xml")
+            if start == -1:
+                # Helpful error with a small preview of what we got back
+                preview = out.strip().splitlines()[:6]
+                raise RuntimeError("uiautomator did not return XML. Output was:\n" + "\n".join(preview))
+
+            # Keep only the XML; uiautomator appends a status line like
+            # "UI hierchary dumped to: /dev/tty" after the XML.
+            xml_str = out[start:]
 
         except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
             print(traceback.format_exc())
