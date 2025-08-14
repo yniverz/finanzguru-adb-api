@@ -160,7 +160,7 @@ class FinanzGuruClient:
 
         print("Click Save")
         self.adb_client.device.shell("input tap 350 1480")
-        time.sleep(25)
+        time.sleep(35)
 
 
     def get_account_current_app_balance(self, account_name: str) -> tuple[float, adb.BasicElement]:
