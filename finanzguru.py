@@ -204,6 +204,8 @@ class FinanzGuruClient:
             "Trading Verlust" if difference < 0 else "Trading Gewinn"
         )
 
+        input("waiting...")
+
         print("return back to main menu")
         self.adb_client.back_keyevent()
 
