@@ -97,7 +97,7 @@ class Adb:
 
             # Keep only the XML; uiautomator appends a status line like
             # "UI hierchary dumped to: /dev/tty" after the XML.
-            xml_str = out[start:]
+            xml_str = self._sanitize_uiautomator_dump(out[start:])
 
         except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
             print(traceback.format_exc())
@@ -113,6 +113,32 @@ class Adb:
 
         tree = ET.parse(io.StringIO(xml_str))
         return tree.getroot()
+    
+    def _sanitize_uiautomator_dump(raw: str) -> str:
+        # Some ROMs print errors before XML if --compressed isn't supported; ignore prefix.
+        start = raw.find("<?xml")
+        if start == -1:
+            raise ValueError("No XML prolog found in uiautomator output.")
+
+        end_tag = "</hierarchy>"
+        end = raw.find(end_tag, start)
+        if end == -1:
+            # Newer builds can use <hierarchy rotation="..."> but still close with </hierarchy>
+            raise ValueError("No </hierarchy> closing tag found in uiautomator output.")
+
+        xml = raw[start:end + len(end_tag)]
+
+        # Clean up common troublemakers
+        # - NULs can sneak in on some devices
+        # - Carriage returns can confuse some parsers
+        # - Non-printable control chars (<0x20) are illegal in XML 1.0 except \t, \n, \r
+        xml = xml.replace("\x00", "").replace("\r", "")
+
+        # Drop any other control chars except \n and \t
+        xml = "".join(ch for ch in xml if ch == "\n" or ch == "\t" or ord(ch) >= 0x20)
+
+        return xml
+
     
 
     def get_list_of_elements(self, xml_root: ET.Element = None) -> tuple[list[BasicElement], list[BasicElement]]:
