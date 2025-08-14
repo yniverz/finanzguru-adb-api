@@ -49,7 +49,7 @@ class FinanzGuruClient:
         for element in elements:
             index = element.attrib["index"]
             text = element.attrib["text"]
-            if text == "Übersicht" and index == "0":
+            if text in ["Übersicht", "Ubersicht"] and index == "0":
                 return True
         
         return False
