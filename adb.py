@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import os
 import shlex
 import subprocess
 import traceback
@@ -92,8 +93,11 @@ class Adb:
             # ── fallback to legacy two-step method ─────────────────────
             self.device.shell("uiautomator dump /sdcard/window_dump.xml")
             # xml_str = self.device.shell("cat /sdcard/window_dump.xml")
-            self.device.pull("/sdcard/window_dump.xml", "window_dump.xml")
-            with open("window_dump.xml", "r", encoding="utf-8") as f:
+
+            # get absolute path this python file is in
+            abs_path = os.path.abspath(__file__)
+            self.device.pull("/sdcard/window_dump.xml", abs_path + "window_dump.xml")
+            with open(abs_path + "window_dump.xml", "r", encoding="utf-8") as f:
                 xml_str = f.read()
 
         tree = ET.parse(io.StringIO(xml_str))
