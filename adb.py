@@ -114,7 +114,7 @@ class Adb:
         tree = ET.parse(io.StringIO(xml_str))
         return tree.getroot()
     
-    def _sanitize_uiautomator_dump(raw: str) -> str:
+    def _sanitize_uiautomator_dump(self, raw: str) -> str:
         # Some ROMs print errors before XML if --compressed isn't supported; ignore prefix.
         start = raw.find("<?xml")
         if start == -1:
