@@ -51,7 +51,6 @@ class FinanzGuruClient:
         for element in elements:
             index = element.attrib["index"]
             text = element.attrib["text"]
-            print(f"Found element: {text} (index: {index})")
             if text in ["Übersicht"]:
                 count += 1
 
