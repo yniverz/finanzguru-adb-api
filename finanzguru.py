@@ -106,9 +106,11 @@ class FinanzGuruClient:
         if amount == 0:
             return False
 
+        print("Click Plus")
         self.adb_client.device.shell("input tap 610 1400")
         time.sleep(5)
 
+        print("Set Direction")
         if amount < 0:
             pass
             # self.device.shell("input tap 270 220")
@@ -117,21 +119,24 @@ class FinanzGuruClient:
             self.adb_client.device.shell("input tap 80 260")
         time.sleep(5)
 
-        # self.device.shell("input tap 350 350")
+        print("Click Amount Field")
         self.adb_client.device.shell("input tap 350 260")
         time.sleep(5)
 
+        print("Set Amount")
         amount_cents = str(int(round(abs(amount)*100)))
         self.adb_client.device.shell("input text "+str(amount_cents))
         time.sleep(5)
 
-        # self.device.shell("input tap 350 530")
+        print("Click Name Field")
         self.adb_client.device.shell("input tap 350 425")
         time.sleep(5)
 
+        print("Set Name")
         self.adb_client.input_text(name)
         time.sleep(8)
 
+        print("Click Category Field")
         self.adb_client.device.shell("input tap 350 630")
         time.sleep(8)
 
@@ -141,16 +146,20 @@ class FinanzGuruClient:
         #     self.device.shell("input tap 150 180")
         #     time.sleep(5)
 
+        print("Click Category Search Field")
         self.adb_client.device.shell("input tap 370 100")
         time.sleep(5)
 
+        print("Enter Category Name")
         self.adb_client.input_text(category)
         time.sleep(2)
 
+        print("Click First result")
         self.adb_client.device.shell("input tap 300 240")
         time.sleep(6)
 
-        self.adb_client.device.shell("input tap 350 1460")
+        print("Click Save")
+        self.adb_client.device.shell("input tap 350 1480")
         time.sleep(25)
 
 
