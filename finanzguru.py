@@ -47,15 +47,16 @@ class FinanzGuruClient:
         root = self.adb_client._get_current_xml()
 
         elements = root.findall(".//*[@text]")
+        count = 0
         for element in elements:
             index = element.attrib["index"]
             text = element.attrib["text"]
             print(f"Found element: {text} (index: {index})")
-            if text in ["Übersicht"] and index == "0":
-                return True
-        
-        return False
-    
+            if text in ["Übersicht"]:
+                count += 1
+
+        return count == 2
+
     def scroll_to_top_overview(self):
         print("Scroll to top / Übersicht")
         if not self.is_overview():

@@ -75,30 +75,29 @@ class Adb:
         """
         # import subprocess, io
 
-        # try:
-        #     # ── direct exec-out (fast & no SD-card writes) ─────────────
-        #     raw: bytes = subprocess.check_output(
-        #         [self.adb_binary_path, "-s", self.device.serial,
-        #          "exec-out", "uiautomator", "dump", "/dev/tty"],
-        #         stderr=subprocess.STDOUT,
-        #     )
-        #     # uiautomator prints a status line AFTER the XML – discard it
-        #     xml_start = raw.find(b"<?xml")
-        #     xml_bytes = raw[xml_start:]
-        #     xml_str = xml_bytes.decode("utf-8", errors="replace")
+        try:
+            # ── direct exec-out (fast & no SD-card writes) ─────────────
+            raw: bytes = subprocess.check_output(
+                [self.adb_binary_path, "-s", self.device.serial,
+                 "exec-out", "uiautomator", "dump", "/dev/tty"],
+                stderr=subprocess.STDOUT,
+            )
+            # uiautomator prints a status line AFTER the XML – discard it
+            xml_start = raw.find(b"<?xml")
+            xml_bytes = raw[xml_start:]
+            xml_str = xml_bytes.decode("utf-8", errors="replace")
 
-        # except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
-        #     print(traceback.format_exc())
-        #     print("Failed to get current XML, falling back to legacy method")
+        except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
+            print(traceback.format_exc())
+            print("Failed to get current XML, falling back to legacy method")
 
+            # ── fallback to legacy two-step method ─────────────────────
+            self.device.shell("uiautomator dump /sdcard/window_dump.xml")
+            # xml_str = self.device.shell("cat /sdcard/window_dump.xml")
 
-        # ── fallback to legacy two-step method ─────────────────────
-        self.device.shell("uiautomator dump /sdcard/window_dump.xml")
-        # xml_str = self.device.shell("cat /sdcard/window_dump.xml")
-
-        self.device.pull("/sdcard/window_dump.xml", "window_dump.xml")
-        with open("window_dump.xml", "r", encoding="utf-8") as f:
-            xml_str = f.read()
+            self.device.pull("/sdcard/window_dump.xml", "window_dump.xml")
+            with open("window_dump.xml", "r", encoding="utf-8") as f:
+                xml_str = f.read()
 
         tree = ET.parse(io.StringIO(xml_str))
         return tree.getroot()
