@@ -91,16 +91,13 @@ class Adb:
         #     print(traceback.format_exc())
         #     print("Failed to get current XML, falling back to legacy method")
 
-        
+
         # ── fallback to legacy two-step method ─────────────────────
         self.device.shell("uiautomator dump /sdcard/window_dump.xml")
         # xml_str = self.device.shell("cat /sdcard/window_dump.xml")
 
-        # get absolute folder path this python file is in
-        abs_path = os.path.dirname(os.path.abspath(__file__)) + "/"
-        print(abs_path)
-        self.device.pull("/sdcard/window_dump.xml", abs_path + "window_dump.xml")
-        with open(abs_path + "window_dump.xml", "r", encoding="utf-8") as f:
+        self.device.pull("/sdcard/window_dump.xml", "window_dump.xml")
+        with open("window_dump.xml", "r", encoding="utf-8") as f:
             xml_str = f.read()
 
         tree = ET.parse(io.StringIO(xml_str))
