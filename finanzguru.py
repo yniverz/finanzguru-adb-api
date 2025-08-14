@@ -32,6 +32,7 @@ class FinanzGuruClient:
         self.adb_client.open_app("de.dwins.financeguru", ".MainActivity")
 
         if self.device_pin:
+            self.adb_client.click(250, 830)
             self.adb_client.input_text(self.device_pin)
 
         print("Waiting for Finanzguru to load...")
