@@ -73,32 +73,35 @@ class Adb:
         2. If that fails (very old Android), we fall back to the
            original /sdcard/window_dump.xml method.
         """
-        import subprocess, io
+        # import subprocess, io
 
-        try:
-            # ── direct exec-out (fast & no SD-card writes) ─────────────
-            raw: bytes = subprocess.check_output(
-                [self.adb_binary_path, "-s", self.device.serial,
-                 "exec-out", "uiautomator", "dump", "/dev/tty"],
-                stderr=subprocess.STDOUT,
-            )
-            # uiautomator prints a status line AFTER the XML – discard it
-            xml_start = raw.find(b"<?xml")
-            xml_bytes = raw[xml_start:]
-            xml_str = xml_bytes.decode("utf-8", errors="replace")
+        # try:
+        #     # ── direct exec-out (fast & no SD-card writes) ─────────────
+        #     raw: bytes = subprocess.check_output(
+        #         [self.adb_binary_path, "-s", self.device.serial,
+        #          "exec-out", "uiautomator", "dump", "/dev/tty"],
+        #         stderr=subprocess.STDOUT,
+        #     )
+        #     # uiautomator prints a status line AFTER the XML – discard it
+        #     xml_start = raw.find(b"<?xml")
+        #     xml_bytes = raw[xml_start:]
+        #     xml_str = xml_bytes.decode("utf-8", errors="replace")
 
-        except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
-            print(traceback.format_exc())
-            print("Failed to get current XML, falling back to legacy method")
-            # ── fallback to legacy two-step method ─────────────────────
-            self.device.shell("uiautomator dump /sdcard/window_dump.xml")
-            # xml_str = self.device.shell("cat /sdcard/window_dump.xml")
+        # except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
+        #     print(traceback.format_exc())
+        #     print("Failed to get current XML, falling back to legacy method")
 
-            # get absolute folder path this python file is in
-            abs_path = os.path.dirname(os.path.abspath(__file__)) + "/"
-            self.device.pull("/sdcard/window_dump.xml", abs_path + "window_dump.xml")
-            with open(abs_path + "window_dump.xml", "r", encoding="utf-8") as f:
-                xml_str = f.read()
+        
+        # ── fallback to legacy two-step method ─────────────────────
+        self.device.shell("uiautomator dump /sdcard/window_dump.xml")
+        # xml_str = self.device.shell("cat /sdcard/window_dump.xml")
+
+        # get absolute folder path this python file is in
+        abs_path = os.path.dirname(os.path.abspath(__file__)) + "/"
+        print(abs_path)
+        self.device.pull("/sdcard/window_dump.xml", abs_path + "window_dump.xml")
+        with open(abs_path + "window_dump.xml", "r", encoding="utf-8") as f:
+            xml_str = f.read()
 
         tree = ET.parse(io.StringIO(xml_str))
         return tree.getroot()
